@@ -1,0 +1,48 @@
+###############################################################################
+# DETECCIÓN DE TENDENCIAS EN SERIES DE TIEMPO                                ##
+# MÉTODOS DE MANN-KENDALL, SEN`S SLOPE Y INNOVATIVE TREND METHOD OF SEN (ITA)##
+###############################################################################
+
+#para limpiar la pantalla
+clc <- 0
+class(clc) <- 'limpiar'
+print.limpiar <- function(rObject) cat("\014") 
+###################################
+library(Kendall)
+library(trend)
+library(openxlsx)
+library(trendchange)
+library(readxl)
+library(dplyr)
+library(writexl)
+
+setwd("C:/Users/Julio/Documents/INVESTIGACION/R SCRIPTS")  #CARPETA DE TRABAJO
+nom_excel<-"ORDENADO_PUERTO INCA.xlsx" #NOMBRES DE HOJAS
+nom_hojas<-excel_sheets(nom_excel) #NOMBRES DE LA HOJA
+ 
+  clc
+  I=1
+  print(nom_hojas[I])
+  print("PROMEDIO ")
+  df <- read.xlsx(nom_excel, sheet = nom_hojas[I]) # HOJA DE EXCEL              
+  mk.test(df$PROM)
+  sens.slope(df$PROM,conf.level = 0.90 )
+  sens.slope(df$PROM,conf.level = 0.95 )
+  sens.slope(df$PROM,conf.level = 0.99 )
+  innovtrend(df$PROM)
+
+  print("MINIMO ")
+  nom_hojas[I]
+  mk.test(df$MIN)
+  sens.slope(df$MIN,conf.level = 0.90 )
+  sens.slope(df$MIN,conf.level = 0.95 )
+  sens.slope(df$MIN,conf.level = 0.99 )
+  innovtrend(df$MIN)
+  
+  print("MAXIMO ")
+  nom_hojas[I]
+  mk.test(df$MAX)
+  sens.slope(df$MAX,conf.level = 0.90 )
+  sens.slope(df$MAX,conf.level = 0.95 )
+  sens.slope(df$MAX,conf.level = 0.99 )
+  innovtrend(df$MAX)
