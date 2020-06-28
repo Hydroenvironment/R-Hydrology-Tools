@@ -1,0 +1,249 @@
+#####################################################################################
+# ANÁLISIS DE FRECUENCIAS DE DATOS CLIMÁTICOS E HIDROLÓGICOS                        #
+# AJUSTE DE DISTRIBUCIONES TEÓRICAS DE FRECUENCIAS #
+#####################################################################################
+
+
+#Modificar y colocar la ruta de la carpeta donde esta el archivo CSV
+setwd("C:/Users/Julio/Documents/INVESTIGACION/R SCRIPTS")
+
+#Indicar el nombre del archivo donde se encuentran los datos 
+datos2<-read.csv("Q_chalaco.csv",na.strings = "NA")
+Est="Chalaco" #Indicar el nombre de la estación
+#Definir los tiempos de retorno
+TR<-c(1.02,2,5,10,20,25,50,100,140,200,500)
+
+options(warn=-1)  
+
+install.packages('rriskDistributions')
+install.packages('climextRemes')
+install.packages('moments')
+install.packages('invgamma')
+install.packages('lmomco')
+install.packages('PearsonDS')
+install.packages('Fitdistrplus')
+library("PearsonDS")
+library(rriskDistributions)
+library(fitdistrplus)
+library(extRemes)
+library(fExtremes)
+library(climextRemes)
+library(evd)
+library("extremeStat")
+library(moments)
+library(invgamma)
+library(lmomco)
+library(gridExtra)
+library(grid)
+
+
+  #####################################
+  #INCIO DE LOS CALCULOS
+  
+  Probab<-1/TR
+
+ #Se define la funcion para elmimnar datos NA
+  
+  delete.na <- function(df, n=0) {
+    df[rowSums(is.na(df)) <= n,]
+  }
+  datos2<-delete.na(datos2)
+  
+  datos<-as.numeric(datos2$Date)
+  #Distribución Normal
+  fitnormal <- fitdist(datos,"norm",method ="mle")
+  #Distribución LogNormal
+  fitln <- fitdist(datos, "lnorm")
+  #Distribuión Pearson Tipo III
+  m <- mean(datos)
+  v <- var(datos)
+  s <- sd(datos)
+  g <- e1071::skewness(datos, type=1)
+  
+  # Correct the sample skew for bias using the recommendation of 
+  # Bobee, B. and R. Robitaille (1977). "The use of the Pearson Type 3 and Log Pearson Type 3 distributions revisited." 
+  # Water Resources Reseach 13(2): 427-443, as used by Kite
+  
+  n <- length(datos)
+  g <- g*(sqrt(n*(n-1))/(n-2))*(1+8.5/n)
+  
+  # We will use method of moment estimates as starting values for the MLE search
+  
+  my.shape <- (2/g)^2
+  my.scale <- sqrt(v)/sqrt(my.shape)
+  my.location <- m-sqrt(v * my.shape)
+  
+  if(my.location < 0){
+    my.location=0
+  }
+  
+  my.param <- list(shape=my.shape, scale=my.scale, location=my.location)
+  
+  dPIII<-function(x, shape, location, scale) PearsonDS::dpearsonIII(x, shape, location, scale, log=FALSE)
+  pPIII<-function(q, shape, location, scale) PearsonDS::ppearsonIII(q, shape, location, scale, lower.tail = TRUE, log.p = FALSE)
+  qPIII<-function(p, shape, location, scale) PearsonDS::qpearsonIII(p, shape, location, scale, lower.tail = TRUE, log.p = FALSE)
+  
+  #Distribuión LogPearson Tipo III
+  fitpearsonIII<-fitdistrplus::fitdist(datos, distr="PIII", method="mle", start=my.param)
+  
+  
+  #Distribuión Gumbel
+  dgumbel <- function(x, a, b) 1/b*exp((a-x)/b)*exp(-exp((a-x)/b))
+  pgumbel <- function(q, a, b) exp(-exp((a-q)/b))
+  qgumbel <- function(p, a, b) a-b*log(-log(p))
+  
+  fitgumbel <- fitdist(datos, "gumbel", start=list(a=10, b=10))
+  
+  #Distribuión Gamma
+  fitgamma <- fitdist(datos, "gamma")
+  
+  #Distribuión Exponencial
+  fiexpo <- fitdist(datos,"exp")
+  
+  #Distribuión Weibull
+  fitW <- fitdist(datos,"weibull",method ="mle")
+  
+  ##Calculo de caudales o precipitaciones
+  Qnormal <- stats::qnorm(p = 1-Probab, mean = fitnormal$estimate[1], sd = fitnormal$estimate[2], lower.tail = TRUE, log.p = FALSE)
+  Qlognormal<-stats::qlnorm(p= 1-Probab, meanlog = fitln$estimate[1], sdlog = fitln$estimate[2], lower.tail = TRUE, log.p = FALSE)
+  
+  QPIII<-qPIII(p=1-Probab, shape=fitpearsonIII$estimate[1], location=fitpearsonIII$estimate[3], scale=fitpearsonIII$estimate[2])
+  
+  QGumbel<-qgumbel(p=1-Probab, a=fitgumbel$estimate[1], b=fitgumbel$estimate[2])
+  #Distribuión Gamma
+  Q_gamma <- stats::qgamma(p=1-Probab, shape=fitgamma$estimate[1], rate = fitgamma$estimate[2], lower.tail = TRUE,log.p = FALSE)
+  #Distibución Exponencial
+  Qexpo <- stats::qexp(p = 1-Probab, rate = fiexpo$estimate)
+  #Distibución Weibull
+  Qweibull<-stats::qweibull(p= 1-Probab, shape=fitW$estimate[1], scale = fitW$estimate[2], lower.tail = TRUE, log.p = FALSE)
+  
+  rm(m,v,s,g,n,my.shape,my.scale,my.location,my.param)
+  
+  m <- mean(log10(datos))
+  v <- var(log10(datos))
+  s <- sd(log10(datos))
+  g <- e1071::skewness(log10(datos), type=1)
+  
+  # Correct the sample skew for bias using the recommendation of 
+  # Bobee, B. and R. Robitaille (1977). "The use of the Pearson Type 3 and Log Pearson Type 3 distributions revisited." 
+  # Water Resources Reseach 13(2): 427-443, as used by Kite
+  
+  n <- length(datos)
+  g <- g*(sqrt(n*(n-1))/(n-2))*(1+8.5/n)
+  
+  # We will use method of moment estimates as starting values for the MLE search
+  
+  my.shape <- (2/g)^2
+  my.scale <- sqrt(v)/sqrt(my.shape)
+  my.location <- m-sqrt(v * my.shape)
+  my.param <- list(shape=my.shape, scale=my.scale, location=my.location)
+  
+  
+  fitlogpearsonIII<-fitdistrplus::fitdist(log10(datos), distr="PIII",start=my.param,lower=c(0,0))
+  
+  QLogPIII<-qPIII(p=1-Probab, shape=fitlogpearsonIII$estimate[1], location=fitlogpearsonIII$estimate[3], scale=fitlogpearsonIII$estimate[2])
+  
+  fitlogpearsonIII$data<-datos
+  
+  QLog_PIII<-10^QLogPIII
+  
+  gf<-gofstat(list(fitnormal, fitln, fitpearsonIII,fitlogpearsonIII,fitgumbel,fitgamma,fiexpo,fitW),
+              fitnames = c("Normal","Lognorm", "Pearson-III","LogPearson-III","Gumbel", "Gamma","Exponencial","Weibull"))
+  
+  Reporte1<-round(cbind(TR,Qnormal,Qlognormal,QPIII,QLog_PIII),3)
+  colnames(Reporte1)<-cbind("TR","Normal","Lognormal","Pearson_III","LogPearson_III")
+  Reporte2<-round(cbind(TR,QGumbel,Qexpo,Q_gamma,Qweibull),3)
+  colnames(Reporte2)<-cbind("TR","Gumbel","Exponencial","Gamma","Weibull")
+  
+  valor_max<-max(Qnormal,Qlognormal,QPIII,QLog_PIII,QGumbel,Qexpo,Q_gamma,Qweibull)
+  
+  g1 <- tableGrob(head(Reporte1,12), theme = ttheme_minimal())
+  separators <- replicate(ncol(g1) - 1,
+                          segmentsGrob(x1 = unit(0, "npc"), gp=gpar(lty=2)),
+                          simplify=FALSE)
+  
+  ## add vertical lines on the left side of columns (after 2nd)
+  g1 <- gtable::gtable_add_grob(g1, grobs = separators,
+                               t = 1, b = nrow(g1), l = seq_len(ncol(g1)-1)+1)
+  
+  
+  
+  g2 <- tableGrob(head(Reporte2,12), theme = ttheme_minimal())
+  separators <- replicate(ncol(g2) - 1,
+                          segmentsGrob(x1 = unit(0, "npc"), gp=gpar(lty=2)),
+                          simplify=FALSE)
+  
+  ## add vertical lines on the left side of columns (after 2nd)
+  g2 <- gtable::gtable_add_grob(g2, grobs = separators,
+                               t = 1, b = nrow(g2), l = seq_len(ncol(g2)-1)+1)
+  
+  R_Chisq<-as.matrix(round(gf$chisq,3))
+  R_Chisqpvaule<-as.matrix(round(gf$chisqpvalue,3))
+  R_Ks<-as.matrix(round(gf$ks,3))
+  R_Kstest<-as.matrix(gf$kstest)
+  R_AIC<-as.matrix(round(gf$aic,3))
+  R_BIC<-as.matrix(round(gf$bic,3))
+  
+  R_GFit<-cbind.data.frame(R_Chisq,R_Chisqpvaule,R_Ks,R_Kstest,R_AIC,R_BIC)
+  colnames(R_GFit)<-cbind("Chi2","Pvalue-Chi2","Dmax-Ks","Ks Test","AIC","BIC")
+  
+  R_GF<-R_GFit[order(R_GFit$AIC,R_GFit$BIC),]
+  
+  g3 <- tableGrob(head(R_GF,8), theme = ttheme_minimal())
+  
+  fitlogpearsonIII$data<-log10(datos)
+  max_value<-max(Reporte1[,2:4],Reporte2[,2:4])
+  pdf(paste0("Resultado_Pruebas_Dist",Est,".pdf"), paper = "a4")
+  grid.newpage()
+  grid.text('Criterios de comparación de las distribuciones, ajustadas mediante el método de máxima verosimilitud',just="left",x=0.01,y=0.90,gp=gpar(fontsize=11, col="Black"))
+  grid.draw(g3)
+  grid.newpage()
+  grid.draw(g1)
+  grid.newpage() 
+  grid.draw(g2)
+  
+  grid.newpage()
+  grid.text(paste0("Parámetros de las pruebas de distribución, estimadas por el método de Máxima Verosimilitud (mle)"),just="left",x=0.01,y=0.90,gp=gpar(fontsize=11, col="Black"))
+  grid.text(paste0("Distribución Normal, Mean = ",round(fitnormal$estimate[1],3),", Sd = ",round(fitnormal$estimate[2],3)),just="left",x=0.01,y=0.80,gp=gpar(fontsize=11, col="Black"))
+  grid.text(paste0("Distribución Lognormal, Meanlog = ",round(fitln$estimate[1],3),", Sdlog = ",round(fitnormal$estimate[2],3)),just="left",x=0.01,y=0.75,gp=gpar(fontsize=11, col="Black"))
+  grid.text(paste0("Distribución Pearson Tipo III, Shape = ",round(fitpearsonIII$estimate[1],3),", Scale = ",round(fitpearsonIII$estimate[2],3)," y Location = ",round(fitpearsonIII$estimate[3],3)),just="left",x=0.01,y=0.70,gp=gpar(fontsize=11, col="Black"))
+  grid.text(paste0("Distribución Log Pearson Tipo III, Shape = ",round(fitlogpearsonIII$estimate[1],3),", Scale = ",round(fitlogpearsonIII$estimate[2],3)," y location = ",round(fitlogpearsonIII$estimate[3],4)),just="left",x=0.01,y=0.65,gp=gpar(fontsize=11, col="Black"))
+  grid.text(paste0("Distribución Gumbel, a = ",round(fitgumbel$estimate[1],3),", b = ",round(fitgumbel$estimate[2],3)),just="left",x=0.01,y=0.60,gp=gpar(fontsize=11, col="Black"))
+  grid.text(paste0("Distribución Gamma, Shape = ",round(fitgamma$estimate[1],3),", Rate = ",round(fitgamma$estimate[2],3)),just="left",x=0.01,y=0.55,gp=gpar(fontsize=11, col="Black"))
+  grid.text(paste0("Distribución Exponencial, Rate = ",round(fiexpo$estimate[1],3)),just="left",x=0.01,y=0.50,gp=gpar(fontsize=11, col="Black"))
+  grid.text(paste0("Distribución Weibull, Shape = ",round(fitW$estimate[1],3),", Scale = ",round(fitpearsonIII$estimate[2],3)),just="left",x=0.01,y=0.45,gp=gpar(fontsize=11, col="Black"))
+  
+  plot(Reporte1[,1],Reporte1[,2],pch=16,col='blueviolet',ylim=c(-5,valor_max),xlab="Tiempo de Retorno (años)", ylab="Valores estimados",log='x')
+  points(Reporte1[,1],Reporte1[,3],pch=16,col='cyan')
+  points(Reporte1[,1],Reporte1[,4],pch=16,col='green')
+  points(Reporte1[,1],Reporte1[,5],pch=16,col='darkgreen')
+  points(Reporte2[,1],Reporte2[,2],pch=16,col='red')
+  points(Reporte2[,1],Reporte2[,3],pch=16,col=641)
+  points(Reporte2[,1],Reporte2[,4],pch=16,col='orange')
+  points(Reporte2[,1],Reporte2[,5],pch=16,col='deeppink')
+  legend("bottomright",legend=c("Norm","Lognorm","Pears3P","Log Pear3P","Gumbel","Exp","Gamma","Weibull"),
+         col=c("blueviolet",'cyan',"green",'darkgreen','red',641,"orange",'deeppink'),horiz=TRUE,cex = 0.65,pch=16)
+  title("Grafico de tiempo de retorno y valores estimados")
+  
+  plot(fitnormal)
+  mtext("Gráficos de la Prueba de Distribución Normal",side = 3, line = -1, outer = TRUE)
+  plot(fitln)
+  mtext("Gráficos de la Prueba de Distribución Lognormal",side = 3, line = -1, outer = TRUE)
+  plot(fitpearsonIII)
+  mtext("Gráficos de la Prueba de Distribución Pearson Tipo III",side = 3, line = -1, outer = TRUE)
+  plot(fitlogpearsonIII)
+  mtext("Gráficos de la Prueba de Distribución Log Pearson Tipo III",side = 3, line = -1, outer = TRUE)
+  plot(fitgumbel)
+  mtext("Gráficos de la Prueba de Distribución Gumbel",side = 3, line = -1, outer = TRUE)
+  plot(fitgamma)
+  mtext("Gráficos de la Prueba de Distribución Gamma",side = 3, line = -1, outer = TRUE)
+  plot(fiexpo)
+  mtext("Gráficos de la Prueba de Distribución Exponencial",side = 3, line = -1, outer = TRUE)
+    plot(fitW)
+  mtext("Gráficos de la Prueba de Distribución Weibull",side = 3, line = -1, outer = TRUE)
+  
+  dev.off()
+  
+ #Guardamos resultados en archivo excel para exportación
+  Excel<-cbind(Reporte1,Reporte2[,2:5])
+  write.csv(file=paste0("Anexo_Distr_Proba_",Est,".csv"), Excel)
