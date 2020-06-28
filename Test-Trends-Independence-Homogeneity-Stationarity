@@ -1,0 +1,267 @@
+#####################################################################################
+# ANÁLISIS EXPLORATORIO DE DATOS CLIMÁTICOS                                         #
+# TESTS PARA DETECCIÓN DE TENCENCIAS, HOMOGENEIDAD, INDEPENDENCIA Y ESTACIONARIEDAD #
+#####################################################################################
+
+#Modificar y colocar la ruta de la carpeta donde esta el archivo CSV
+directorio<-setwd("C:/Users/Julio/Documents/INVESTIGACION/R SCRIPTS/")
+#Colocar el nombre del archivo CSV
+dat = read.csv("Q_Chalaco.csv", header = TRUE)
+#Colocar el Nombre de la Estación
+Name_Estac<-'Est. Ollachea' #Cambiar el nombre de la estación para que corresponda con los datos
+
+options(warn=-1)#Remover warnings
+
+# install.packages("grid")
+# install.packages("ismev")
+# install.packages("Renext")
+# install.packages("berryFunctions")
+# install.packages("extremeStat")
+# install.packages("trend")
+# install.packages("gimms")
+# install.packages("caTools")
+#install.packages("coin") #Esta librería ejecuta la prueba de Wilcoxon
+
+library("trend")
+library("grid")
+library("ismev")
+library("Renext")
+library("berryFunctions")
+library("extremeStat")
+library("zyp")
+library("gimms")
+library("coin")
+  
+  aini<-min(dat$Anne)
+  afin<-max(dat$Anne)
+  
+  nel<-length(dat$Date)
+
+  datos<-as.numeric(dat$Date)
+  
+
+#A continuación el código procesará los datos y aplicará los tests correspondientes,
+#integrando los resultados en un solo archivo .pdf incluyendo fundamentos de cada tests
+  
+    #################
+    Yue_Pilon<- zyp.trend.vector(dat$Date, x=1:nel, method=c("yuepilon"),conf.intervals=TRUE, preserve.range.for.sig.test=TRUE)
+    Ho_yp1 <- paste("Se acepta Ho debido a que Pvalue =", round(Yue_Pilon[6],4) ," es menor que Tau =",round(Yue_Pilon[5],4),sep=" ")
+    Ho_yp2 <- paste("Por lo tanto, la serie no muestra tendencia",collapse = "/n")
+    Hi_yp1 <- paste("Se rechaza Ho debido a que Pvalue =", round(Yue_Pilon[6],4) ," es mayor que Tau =",round(Yue_Pilon[5],4),sep=" ")
+    Hi_yp2 <- paste("Por lo tanto, la serie muestra tendencia",sep =" ") 
+  
+    #Definicion de eliminacion de datos NA 
+    delete.na <- function(df, n=0) {
+    df[rowSums(is.na(df)) <= n,]
+    }
+    dat<-delete.na(dat)#agregar dat<-
+    ##############
+    nel<-length(dat$Date)
+    
+    mktest<-mk.test(dat$Date)
+    Ho_mk1 <- paste("Se acepta Ho debido a que |Z| =", round(abs(mktest$statistic),4) ," es menor que Zc = 1.96 (a=0.05)",sep=" ")
+    Ho_mk2 <- paste("Por lo tanto, la serie no muestra tendencia",collapse = "/n")
+    Hi_mk1 <- paste("Se rechaza Ho debido a que |Z| =", round(abs(mktest$statistic),4) ," es mayor que Zc= 1.96 (a=0.05)",sep="")
+    Hi_mk2 <- paste("Por lo tanto, la serie muestra tendencia",sep =" ")
+    
+    mktest_z=paste("Z = ",round(mktest$statistic,4),", n = ",round(mktest$parameter,4),", p-value =",round(mktest$p.value,4),sep=" ")
+    mktest_Est=round(mktest$estimates,4)
+    
+    if (abs(mktest$statistic)<=qnorm(0.05)) {Ho_mk1
+    }else{Hi_mk1}
+    if (abs(mktest$statistic)<=qnorm(0.05)) {Ho_mk2
+    }else{Hi_mk2}  
+    
+    ###Cambiar el nombre del archivo de salida en P
+    pdf(paste0("Est_",Name_Estac,".pdf"), paper = "a4")
+    pdf.options(reset = TRUE)
+      grid.newpage()
+    grid.text('Prueba de Mann Kendall (MK) de detección de tendencias',x=0.5,y=0.98,gp=gpar(fontsize=11, col="Black"))
+    grid.text("Esta es una prueba basada en rango libre de distribución que se basa en una medida alternativa de 
+  correlación conocida como coeficiente de correlación de Kendall o T (tau) de Kendall. Al igual que el 
+  método de Spearman, es robusto al efecto de valores extremos (es decir a datos hidrológicos muy 
+  sesgados) y a desviaciones de una relación lineal. ",just="left",x=0.01,y=0.88,gp=gpar(fontsize=11, col="Black")) 
+   
+    grid.text('Paso 1: Definición de hipótesis',x=0.2,y=0.7, gp=gpar(fontsize=11, col="Black"))
+    grid.text('H0:	La muestra es estacionaria (no tiene tendencia)', x=0.2,y=0.65, just="left",gp=gpar(fontsize=11, col="Black"))
+    grid.text('H1:	La distribución de Xj e Xk no son identicas para todo j , k <= n tal que j<>k',x=0.2,y=0.60, just="left",gp=gpar(fontsize=11, col="Black"))		
+    grid.text('Paso 2:	Reglas de aceptación',x=0.09,y=0.55, gp=gpar(fontsize=11, col="Black"))
+    grid.text('Se rechaza H0 si :
+  Z < -1.96 ó Z > 1.96		Condición de significancia  a = 0.05',x=0.2,y=0.5, just="left", gp=gpar(fontsize=11, col="Black"))		
+    
+    grid.text(paste('Resultados Test Mann-Kendall - Estación ',Name_Estac,sep=" "),x=0.05,y=0.42,just="left",gp=gpar(fontsize=11, col="Black"))
+    grid.text(mktest_z,x=0.15,y=0.38,just="left", gp=gpar(fontsize=11, col="Black"))
+    grid.text(
+      if (abs(mktest$statistic)<=1.96) 
+        {Ho_mk1}else{Hi_mk1},x=0.15,y=0.32, just="left", gp=gpar(fontsize=11, col="Black"))
+    
+    grid.text(
+      if (abs(mktest$statistic)<=1.96) 
+      {Ho_mk2}else{Hi_mk2},x=0.15,y=0.28, just="left", gp=gpar(fontsize=11, col="Black"))
+    #############################
+  #   grid.newpage()
+  #   grid.text('Análisis de tendencia no lineal preblanqueado - Método de Yue and Pilon',x=0.5,y=0.95,gp=gpar(fontsize=11, col="Black"))
+  #   grid.text('Mediante este método las la pendientes se estiman con la TSA, si es casi igual a cero, entonces no es necesario realizar el análisis de tendencias. Si difiere de cero, entonces se supone que es
+  # lineal y los datos se desvían por la pendiente y el AR (1) se calcula para la serie desvinculada. Esto se conoce como el procedimiento de pre blanqueamiento sin tendencia (TFPW). Los residuos deben ser una serie independiente 
+  # La tendencia y los residuos se mezclan juntos. La prueba de Mann-Kendall es la aplicado a las series combinadas para evaluar la importancia de la tendencia.
+  # Una variación de este paquete, al menos desde el método Yue y Pilon, es que por defecto los valores
+  # utilizados para calcular la significación se vuelven a inflar dividiendo entre (1 - AR (1))',just="left",x=0.01,y=0.84,gp=gpar(fontsize=11, col="Black")) 
+  # 
+  #   grid.text('Paso 1: Definición de hipótesis',x=0.2,y=0.7, gp=gpar(fontsize=11, col="Black"))
+  #   grid.text('H0:	La muestra es estacionaria (no tiene tendencia)', x=0.2,y=0.65, just="left",gp=gpar(fontsize=11, col="Black"))
+  #   grid.text('H1:	La distribución de Xj e Xk no son identicas para todo j , k <= n tal que j<>k',x=0.2,y=0.60, just="left",gp=gpar(fontsize=11, col="Black"))		
+  #   grid.text('Paso 2:	Reglas de aceptación',x=0.09,y=0.55, gp=gpar(fontsize=11, col="Black"))
+  #   grid.text('Se rechaza H0 si :
+  #             Pvalue > Tau		Condición de significancia  a = 0.05',x=0.2,y=0.5, just="left", gp=gpar(fontsize=11, col="Black"))		
+  #   
+  #   grid.text(paste('Resultados Yue Pilon - Estación ',Name_Estac,sep=" "),x=0.05,y=0.42,just="left",gp=gpar(fontsize=11, col="Black"))
+  #   grid.text(paste0('Mediana de tendencia según criterio TSA (Theil & Sen Approach) =',round(Yue_Pilon[2],3)),x=0.05,y=0.38,just="left", gp=gpar(fontsize=11, col="Black"))
+  #   grid.text(paste0('Coeficiente de autocorrelación r1 =',round(Yue_Pilon[8],3)),x=0.05,y=0.34,just="left", gp=gpar(fontsize=11, col="Black"))
+  #   grid.text(paste0('Estimador de pendiente de Sen =',round(Yue_Pilon[3],3)),x=0.05,y=0.30,just="left", gp=gpar(fontsize=11, col="Black"))
+  #   
+  # 
+  #   
+  #   grid.text(
+  #     if (round(Yue_Pilon[5],3)>round(Yue_Pilon[6],3)) 
+  #     {Ho_yp1}else{Hi_yp1},x=0.15,y=0.22, just="left", gp=gpar(fontsize=11, col="Black"))
+  #   
+  #   grid.text(
+  #     if (round(Yue_Pilon[5],3)>round(Yue_Pilon[6],3)) 
+  #     {Ho_yp2}else{Hi_yp2},x=0.15,y=0.18, just="left", gp=gpar(fontsize=11, col="Black"))  
+    #############################
+    ## Prueba de Estacionariedad e Independencia Wald-Wolfowitz
+    grid.newpage()
+    grid.text('Prueba de Estacionariedad e Independencia Wald-Wolfowitz',x=0.5,y=0.95,gp=gpar(fontsize=11, col="Black"))
+    grid.text("Wald and Wolfowitz (1940), introdujeron una interesante aplicación del número total de rachas (RN) 
+  en el problema de dos muestras de tamaños m y n, para probar la hipótesis de que ellas provienen  
+  de una misma distribución contra la alternativa de que provienen de distribuciones diferentes.   ",just="left",x=0.01,y=0.8,gp=gpar(fontsize=11, col="Black")) 
+    
+    grid.text("Los autores mezclaron las observaciones de las dos muestras, luego las representaron con 1 los
+  éxitos y con 0 los fracasos, encontraron la distribución exacta de RN, la media E[RN] y la varianza 
+  V [RN] exactas y asintóticas; demostraron también que RN tiene distribución asintótica normal.",just="left",x=0.01,y=0.7,gp=gpar(fontsize=11, col="Black"))
+    
+    grid.text("Las tablas de la distribución bajo la hipótesis nula de la estadística de prueba de Wald-Wolfowitz 
+  fueron calculadas por Swed and Eisenhart (1943), cuando el número total de éxitos es menor o igual 
+  que 20. Posteriormente, Wald and Wolfowitz (1949) también calcularon la distribución de RN bajo la 
+  alternativa y demostraron que es normal. Dieron así una expresión para su varianza asintótica.",just="left",x=0.01,y=0.55,gp=gpar(fontsize=11, col="Black"))
+    
+    grid.text("Asano (1965) propuso una modificación de la prueba de rachas de Wald and Wolfowitz (1940) para 
+  probar si dos muestras observadas en un arreglo circular fueron extraídas de la misma distribución. 
+  La principal ventaja de esta prueba es que minimiza el número de supuestos sobre la distribución 
+  muestreada. Dunn (1969) determinó la distribución del número total de patrones condicionado al 
+  número total de símbolos que aparecen en la sucesión; además, calculó los valores críticos de la 
+  estadística cuando la sucesión es binaria,y propuso una prueba de aleatoriedad que rechaza la 
+  hipótesis nula cuando hay pocas o muchas rachas.",just="left",x=0.01,y=0.35,gp=gpar(fontsize=11, col="Black"))
+    
+    grid.newpage()
+    grid.text('Paso 1: Definición de hipótesis',x=0.2,y=0.95, gp=gpar(fontsize=11, col="Black"))
+    grid.text('Ho:Las muestras proceden de un proceso aleatorio (observac. independientes)', x=0.2,y=0.9, just="left",gp=gpar(fontsize=11, col="Black"))
+    grid.text('H1:	Las muestras no proceden de un proceso aleatorio (observ. dependientes)',x=0.2,y=0.85, just="left",gp=gpar(fontsize=11, col="Black"))		
+    grid.text('Paso 2:	Reglas de aceptación',x=0.09,y=0.80, gp=gpar(fontsize=11, col="Black"))
+    grid.text('Se rechaza H0 si :
+              Z < -1.96 ó Z > 1.96		Condición de significancia  a = 0.05',x=0.2,y=0.75, just="left", gp=gpar(fontsize=11, col="Black"))		
+    
+    grid.text(paste('Resultados Wald-Wolfowitz - Estación ',Name_Estac,sep=" "),x=0.05,y=0.68,just="left",gp=gpar(fontsize=11, col="Black"))
+    WW<-ww.test(dat$Date)
+    
+    Howw <- paste("Se acepta Ho debido a que |Z| =", round(abs(WW$statistic),4) ,"es menor que Zc = 1.96 (a=0.05). 
+                  Por lo tanto, la serie es aleatoria e independiente",sep=" ")
+    Hiww <- paste("Se rechaza Ho debido a que |Z| =", round(abs(WW$statistic),4) ,"es mayor que Zc= 1.96 (a=0.05). 
+                  Por lo tanto, la serie no es aleatoria e independiente",sep=" ")
+    
+    
+    Z_Wald=paste("Z =",round(WW$statistic,4),", n =",round(WW$parameter,4),", p-value =",round(WW$p.value,4),sep=" ")
+    grid.text(Z_Wald,x=0.25,y=0.62, just="left", gp=gpar(fontsize=11, col="Black"))
+    
+  
+    grid.text(
+     if (abs(WW$statistic)<=1.96) {Howw
+      }else{Hiww},x=0.15,y=0.55, just="left", gp=gpar(fontsize=11, col="Black"))
+    
+  #####################
+  ## Prueba de Pettitt de detección de ruptura de series 
+    grid.newpage()
+    grid.text('Prueba de Pettitt de detección de ruptura de series',x=0.5,y=0.95,gp=gpar(fontsize=11, col="Black"))
+    grid.text('La prueba de Pettitt se basa en la prueba de Mann-Whitney, donde una ruptura puede ser definida de 
+  manera general por un cambio en la ley de probabilidad f(x) de una serie cronológica en un instante 
+  dado (normalmente desconocido). Según CERESTA (1986) el fundamento de esta prueba es el sigui-
+  ente, la serie estudiada es dividida en dos sub-muestras de tamaño m y n respectivamente. 
+  Los valores de las dos muestras son reagrupados y ordenados en forma creciente. Se calcula enton-
+  ces, la suma de los rangos de los elementos de cada sub-muestra respecto a la muestra total. 
+  Un estadístico es definido a partir de estas dos sumas y se prueba una hipótesis nula en donde se 
+  asume que las dos sub-muestras pertenecen a la misma población. 
+  Esta prueba fue modificada por Pettitt (Pettitt,1979), de esta forma, la hipótesis nula de la prueba 
+  denota la ausencia de ruptura en la serie.',just="left",x=0.01,y=0.7,gp=gpar(fontsize=11, col="Black")) 
+    
+    s.res <- pettitt.test(dat$Date)
+    n <- s.res$nobs
+    i <- s.res$estimate[1]
+    s.1 <- mean(dat[1:i,"Date"])
+    s.2 <- mean(dat[(i+1):n,"Date"])
+    s <- ts(c(rep(s.1,i), rep(s.2,(n-i))))
+    tsp(s) <- tsp(dat[,"Date"])
+    
+    
+    grid.text(paste('Resultados Prueba de Pettitt - Estación ',Name_Estac,sep=" "),x=0.05,y=0.40,just="left",gp=gpar(fontsize=11, col="Black"))  
+    rpte_ptt <- paste("El año de probable cambio es ",dat$Anne[s.res$estimate[1]],", p-value=",round(s.res$p.value,3),", U* =",s.res$statistic,sep=" ")
+  
+    grid.text(rpte_ptt,just="left",x=0.1,y=0.35,gp=gpar(fontsize=11, col="Black")) 
+    adiv<-dat$Anne[s.res$estimate[1]]
+    sg1<-s.res$estimate[1]
+    sg2<-nel-sg1
+  ##############
+  
+    grid.newpage()
+    grid.text('Prueba de los rangos con signo de Wilcoxon',x=0.5,y=0.98,gp=gpar(fontsize=11, col="Black"))
+  
+    grid.text('La prueba de los rangos con signo de Wilcoxon es una prueba no paramétrica para comparar el rango 
+  medio de dos muestras relacionadas y determinar si existen diferencias entre ellas. Se utiliza como alt-
+  ternativa a la prueba t de Student cuando no se puede suponer la normalidad de dichas muestras. 
+  Debe su nombre a Frank Wilcoxon, que la publicó en 1945, es una prueba no paramétrica de compa-
+  ración de dos muestras relacionadas y por lo tanto no necesita una distribución específica, usa más 
+  bien el nivel ordinal de la variable dependiente. 
+  Se utiliza para comparar dos mediciones relacionadas y determinar si la diferencia entre ellas se 
+  debe al azar o no (en este último caso, que la diferencia sea estadísticamente significativa).',just="left",x=0.01,y=0.82,gp=gpar(fontsize=11, col="Black")) 
+    
+    grid.text('a) Condicion para n1, n2 menores a 10 (uno o los dos)',just="left",x=0.01,y=0.66,gp=gpar(fontsize=11, col="Black")) 							
+    
+    grid.text('Paso 1: Definición de hipótesis',x=0.2,y=0.63, gp=gpar(fontsize=11, col="Black"))
+    grid.text('Ho: Las muestras provienen de la misma población', x=0.2,y=0.58, just="left",gp=gpar(fontsize=11, col="Black"))  
+    grid.text('H1: Las muestras no provienen de la misma población', x=0.2,y=0.53, just="left",gp=gpar(fontsize=11, col="Black"))  				
+    grid.text('Paso 2: Reglas de aceptación',x=0.2,y=0.48, gp=gpar(fontsize=11, col="Black"))
+    grid.text('Se rechaza Ho si: W <Linf ó W > Lsup	Condición de significancia  a = 0.05', x=0.2,y=0.43, just="left",gp=gpar(fontsize=11, col="Black"))  
+    
+    grid.text('b) Condicion para n1, n2 mayores a 10',just="left",x=0.01,y=0.38,gp=gpar(fontsize=11, col="Black"))
+    grid.text('Paso 1: Definición de hipótesis',x=0.2,y=0.33, gp=gpar(fontsize=11, col="Black"))							
+    grid.text('Ho: Las muestras provienen de la misma población', x=0.2,y=0.28, just="left",gp=gpar(fontsize=11, col="Black"))  
+    grid.text('H1: Las muestras no provienen de la misma población', x=0.2,y=0.23, just="left",gp=gpar(fontsize=11, col="Black"))  						
+    grid.text('Paso 2: Reglas de aceptación',x=0.2,y=0.18, gp=gpar(fontsize=11, col="Black"))
+    grid.text('Se rechaza Ho si: Z >1.96 ó Z < -1.96	Condición de significancia  a = 0.05', x=0.2,y=0.13, just="left",gp=gpar(fontsize=11, col="Black"))
+    
+    Grupos <- data.frame(
+      pd = dat$Date,
+      age = factor(rep(c("G1", "G2"), c(sg1,sg2)))
+    )
+    
+    wt <- wilcox_test(pd ~ age, data = Grupos,distribution = "exact", conf.int = TRUE)
+    
+    Howc <- paste("Se acepta Ho debido a que |Z| =", round(abs(wt@statistic@teststatistic),3) ,"es menor que Zc = 1.96 (a=0.05). 
+  Por lo tanto, la serie proviene de la misma población",sep=" ")
+    Hiwc <- paste("Se rechaza Ho debido a que |Z| =", round(abs(wt@statistic@teststatistic),3) ,"es mayor que Zc= 1.96 (a=0.05). 
+  Por lo tanto, la serie no proviene de la misma población",sep=" ")
+    
+    
+    grid.newpage() 
+    grid.text(paste('Resultados Prueba de Wilcoxon - Estación ',Name_Estac,sep=" "),x=0.05,y=0.98,just="left",gp=gpar(fontsize=11, col="Black"))   
+    grid.text(
+      if (abs(wt@statistic@teststatistic)<=1.96) {Howc
+      }else{Hiwc},x=0.19,y=0.92,just="left",gp=gpar(fontsize=11, col="Black"))	  
+  
+####################  
+#plot(dat$Anne,dat$Date, pch = 18, col = "blue", type = "b", lty = 2,xlab = "Años") 
+#lines(dat$Anne,dat$Date,col = "blue")
+#Finalmente usamos el wrapper de la función pdf
+dev.off()
+
+#En caso de borrar todas las variables,usar:
+#rm(list = ls(all.names = TRUE))
