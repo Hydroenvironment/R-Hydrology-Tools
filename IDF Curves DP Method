@@ -1,0 +1,87 @@
+library(RColorBrewer)
+#install.packages("plotly")
+install.packages("IRdisplay")
+library(plotly)
+library(IRdisplay)
+
+
+Est="Chalaco" #Indicar el nombre de la estación
+
+#Definir la ruta donde se encuentran los archivos
+setwd("C:/Users/Julio/Documents/INVESTIGACION/R SCRIPTS")
+
+#Indicar el nombre del archivo donde se encuentran los datos 
+datos2<-read.csv("Anexo_Distr_Proba_Chalaco.csv",na.strings = "NA")
+
+
+Pdist<-colnames(datos2)
+Tr<-as.data.frame(t(datos2$TR))
+
+Duracion<-cbind(5,10,15,20,25,30,40,50,60)
+Duracion2<-cbind(90,120,240,360,420,600,720,1440)
+
+
+for (PD in 3:10){
+  Pdist[PD]
+  Vmax<-as.data.frame(t(datos2[,PD]))
+  num_celd<-dim(Vmax)
+  num_colum<-dim(Duracion)
+  Tabla1 = matrix(nrow=num_celd[2], ncol=num_colum[2], byrow = TRUE)
+  
+  for (i in 1:num_celd[2]) {
+    a<-Vmax[,i]   
+    Tabla1[i,]<-a*(Duracion/1440)^0.25  
+    }
+  Tabla2<-matrix(nrow=num_celd[2], ncol=num_colum[2], byrow = TRUE)
+  Tabla_TR<-matrix(nrow=num_celd[2], ncol=num_colum[2], byrow = TRUE)
+  Tabla_Time<-matrix(nrow=num_celd[2], ncol=num_colum[2], byrow = TRUE)
+  
+  for (i in 1:num_celd[2]){
+    Tabla2[i,]<-Tabla1[i,]*60/Duracion
+    }
+  for (i in 1:num_celd[2]){
+    Tabla_TR[i,]<-Tr[,i]
+    }
+  for (i in 1:num_colum[2]){
+    Tabla_Time[,i]<-Duracion[i]
+    }
+  Y<-as.vector(unlist(t(Tabla2)))
+  X1<-as.vector(unlist(t(Tabla_TR)))
+  X2<-as.vector(unlist(t(Tabla_Time)))
+  ML1<-cbind.data.frame(X1,X2,Y)
+  modelo <- lm(log10(Y) ~ log10(X1)+log10(X2), data = ML1 )
+  K_ml<-10^modelo$coefficients[1]
+  alpha_ml<-modelo$coefficients[2]
+  Beta_ml<-abs(modelo$coefficients[3])
+  Duracion_total<-cbind(Duracion,Duracion2)
+  num_celd<-dim(Duracion_total)
+  num_colum<-dim(Tr)
+  Tabla_3<-matrix(nrow=num_celd[2], ncol=num_colum[2], byrow = TRUE)
+  Numerador<-t(K_ml*(Tr^alpha_ml))
+  for (i in 1:num_celd[2]){
+    Denominador<-Duracion_total[,i]
+    Tabla_3[i,]<- Numerador/(Denominador^Beta_ml)
+    }
+
+#we will select the first 4 colors in the Set1 palette
+cols<-brewer.pal(n=num_colum[2],name="Set3")
+#cols contain the names of four different colors
+
+plot(Duracion_total,Tabla_3[,1],type="l",lwd=2,xlim=c(5,120),ylim=c(5,max(Tabla_3)),xlab="Duración (min)",ylab="Intensidad (mm/hr)",
+     main=paste0('Curva Intensidad - Duración - Frecuencia - Distribución ',Pdist[PD]))
+legend("topright",legend = c("Tr=1.02 años","Tr=2 años","Tr=5 años","Tr=10 años","Tr=20 años",
+                             "Tr=25 años","Tr=50 años","Tr=100 años","Tr=140 años","Tr=200 años","Tr=500 años"),
+       col = c("#000000","#FFFFB3","#BEBADA","#FB8072","#80B1D3","#FDB462","#B3DE69","#FCCDE5","#D9D9D9","#BC80BD","#CCEBC5")
+       ,lwd=c(4,4,4,4,4,4,4,4,4,4,4))
+
+for (i in 2:num_colum[2]){
+  
+  lines(Duracion_total,Tabla_3[,i],lwd=2,col=cols[i],type="l")
+}
+
+Coef_RL<-cbind(K_ml,alpha_ml,Beta_ml)
+colnames(Tabla_3)<-Tr
+rownames(Tabla_3)<-Duracion_total
+write.csv(file=paste0("Reporte_Valores_Max_Dist_",Pdist[PD],".csv"), Tabla_3)
+write.csv(file=paste0("Reporte_Coef_",Pdist[PD],".csv"), Coef_RL)
+}
