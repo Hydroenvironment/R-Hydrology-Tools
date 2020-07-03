@@ -1,2 +1,2 @@
 # R-Hydrology-Tools
-Training of data handling and descriptive statistics in R
+Toolkit for data handling, exploratory analysis, flood and drought analysis in R
